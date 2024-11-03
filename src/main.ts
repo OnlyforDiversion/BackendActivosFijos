@@ -26,7 +26,7 @@ async function bootstrap() {
 
   // Configuración de CORS para permitir producción y desarrollo en cualquier entorno
   const allowedOrigins = [
-    'https://activosfijosemi.up.railway.app', // Frontend de producción
+    'https://activosfijos.up.railway.app', // Frontend de producción
     'http://localhost:5173' // Frontend de pruebas
   ];
 

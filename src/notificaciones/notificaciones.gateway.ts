@@ -4,8 +4,8 @@ import { Server, Socket } from 'socket.io';
 @WebSocketGateway({
   cors: {
     origin: process.env.NODE_ENV === 'production'
-      ? ['https://activosfijosemi.up.railway.app', 'http://localhost:5173'] // Permitir tanto el front de producción como el de pruebas
-      : ['http://localhost:5173', 'https://activosfijosemi.up.railway.app'], // También permitir ambos en desarrollo
+      ? ['https://activosfijos.up.railway.app', 'http://localhost:5173'] // Permitir tanto el front de producción como el de pruebas
+      : ['http://localhost:5173', 'https://activosfijos.up.railway.app'], // También permitir ambos en desarrollo
     methods: ['GET', 'POST'],  // Métodos permitidos
     credentials: true,  // Habilitar el envío de cookies o credenciales
   }
