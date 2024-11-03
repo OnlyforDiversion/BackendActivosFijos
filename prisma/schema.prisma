@@ -1,0 +1,344 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                       String                @id @default(cuid())
+  username                 String                @unique
+  email                    String                @unique
+  password                 String
+  name                     String?
+  role                     String
+  resetToken               String?
+  resetTokenExpiration     DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  asignaciones             Asignacion[]
+  reasignacionesAnteriores Reasignacion[]        @relation("UsuarioAnterior")
+  reasignacionesNuevas     Reasignacion[]        @relation("UsuarioNuevo")
+  devoluciones             Devolucion[]
+
+  @@map("users")
+}
+
+model Personal {
+  id                       Int                   @id @default(autoincrement())
+  nombre                   String
+  ci                       String                @unique
+  email                    String                @unique
+  fkCargo                  Int
+  fkUnidad                 Int
+  activo                   Boolean               @default(true) // Campo para marcar si está activo
+  asignaciones             Asignacion[]
+  cargo                    Cargo                 @relation(fields: [fkCargo], references: [id])
+  unidad                   Unidad                @relation(fields: [fkUnidad], references: [id])
+  reasignacionesAnteriores Reasignacion[]        @relation("PersonalAnterior")
+  reasignacionesNuevas     Reasignacion[]        @relation("PersonalNuevo")
+  devoluciones             Devolucion[]
+  historialCargosUnidades  HistorialCargoUnidad[]
+  revisiones               Revision[]
+  revisionesPersonales     RevisionPersonal[]
+
+  @@map("personal")
+  @@index([fkCargo])
+  @@index([fkUnidad])
+}
+
+model Cargo {
+  id       Int                      @id @default(autoincrement())
+  nombre   String                   @unique
+  personal Personal[]
+  historialCargosUnidades  HistorialCargoUnidad[]  // Relación inversa con HistorialCargoUnidad
+
+  @@map("cargos")
+}
+
+model Unidad {
+  id       Int                      @id @default(autoincrement())
+  nombre   String                   @unique
+  personal Personal[]
+  historialCargosUnidades  HistorialCargoUnidad[]  // Relación inversa con HistorialCargoUnidad
+
+  @@map("unidades")
+}
+
+model HistorialCargoUnidad {
+  id              Int      @id @default(autoincrement())
+  fkPersonal      Int
+  fkCargo         Int
+  fkUnidad        Int
+  
+  fechaCambio     DateTime  @default(now())
+  personal        Personal  @relation(fields: [fkPersonal], references: [id])
+  cargo           Cargo     @relation(fields: [fkCargo], references: [id])
+  unidad          Unidad    @relation(fields: [fkUnidad], references: [id])
+
+  @@map("historial_cargo_unidad")
+  @@index([fkPersonal])
+  @@index([fkCargo])
+  @@index([fkUnidad])
+}
+
+
+model Partida {
+  id                     Int            @id @default(autoincrement())
+  codigoPartida          String         @unique
+  nombre                 String
+  vidaUtil               Int
+  porcentajeDepreciacion Float
+  activoModelos          ActivoModelo[]
+
+  @@map("partidas")
+}
+
+model ActivoModelo {
+  id             Int            @id @default(autoincrement())
+  fkPartida      Int
+  nombre         String
+  descripcion    String
+  fechaIngreso   DateTime
+  costo          Float
+  estado         String
+  codigoAnterior String?
+  codigoNuevo    String         @unique
+  ordenCompra    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @default(now())
+  createdBy      String
+  updatedBy      String?
+  cantidad       Int
+  partida        Partida        @relation(fields: [fkPartida], references: [id])
+  activoUnidades ActivoUnidad[]
+
+  @@map("activo_modelos")
+  @@index([fkPartida])
+}
+
+model ActivoUnidad {
+  id                  Int                      @id @default(autoincrement())
+  fkActivoModelo      Int
+  codigo              String                   @unique
+  asignado            Boolean                  @default(false)
+  costoActual         Float
+  estadoActual        String
+  estadoCondicion     String
+  fkPersonalActual    Int?                     // Nuevo campo para guardar el personal actual asignado
+  vidaUtilCumplida    Boolean                  @default(false) // Indicador si el activo ha cumplido su vida útil.
+  fechaUltimaDepreciacion DateTime?            // Fecha en que se realizó la última depreciación.
+  activoModelo        ActivoModelo             @relation(fields: [fkActivoModelo], references: [id])
+  asignacionActivos   AsignacionActivoUnidad[]
+  bajas               Baja[]
+  depreciaciones      Depreciacion[]
+  reasignaciones      Reasignacion[]
+  historialCambios    HistorialCambio[]
+  estadoActivos       EstadoActivo[]
+  devoluciones        Devolucion[]
+
+  @@map("activo_unidades")
+  @@index([fkActivoModelo])
+  @@index([asignado])
+}
+
+model Asignacion {
+  id                Int                      @id @default(autoincrement())
+  fkUsuario         String
+  fkPersonal        Int
+  avalAsignacion    String
+  fechaAsignacion   DateTime
+  detalle           String
+  personal          Personal                 @relation(fields: [fkPersonal], references: [id])
+  usuario           User                     @relation(fields: [fkUsuario], references: [id])
+  asignacionActivos AsignacionActivoUnidad[]
+  historialCambios  HistorialCambio[]
+
+  @@map("asignaciones")
+  @@index([fkUsuario])
+  @@index([fkPersonal])
+}
+
+model AsignacionActivoUnidad {
+  id             Int          @id @default(autoincrement())
+  fkAsignacion   Int
+  fkActivoUnidad Int
+  activoUnidad   ActivoUnidad @relation(fields: [fkActivoUnidad], references: [id])
+  asignacion     Asignacion   @relation(fields: [fkAsignacion], references: [id])
+
+  @@map("asignacion_activo_unidades")
+  @@index([fkAsignacion])
+  @@index([fkActivoUnidad])
+}
+
+model Baja {
+  id             Int          @id @default(autoincrement())
+  fkActivoUnidad Int
+  fecha          DateTime
+  motivo         String
+  estado         BajaEstado   @default(PENDIENTE)
+  creadoPor      String
+  aprobadoPor    String?
+  activoUnidad   ActivoUnidad @relation(fields: [fkActivoUnidad], references: [id])
+
+  @@map("bajas")
+  @@index([fkActivoUnidad])
+}
+
+enum BajaEstado {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+model Depreciacion {
+  id             Int          @id @default(autoincrement())
+  fkActivoUnidad Int
+  fecha          DateTime
+  valor          Float
+  valorNeto      Float
+  periodo        String
+  metodo         MetodoDepreciacion
+  causaEspecial  String?
+  activoUnidad   ActivoUnidad  @relation(fields: [fkActivoUnidad], references: [id])
+  historialCambios  HistorialCambio[]
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now())
+
+  @@map("depreciaciones")
+  @@index([fkActivoUnidad])
+}
+enum MetodoDepreciacion {
+  LINEA_RECTA
+  SALDOS_DECRECIENTES
+}
+
+model Reasignacion {
+  id                 Int          @id @default(autoincrement())
+  fkActivoUnidad     Int
+  fkUsuarioAnterior  String
+  fkUsuarioNuevo     String
+  fkPersonalAnterior Int
+  fkPersonalNuevo    Int
+  fechaReasignacion  DateTime     @default(now())
+  avalReasignacion   String
+  detalle            String
+  activoUnidad       ActivoUnidad @relation(fields: [fkActivoUnidad], references: [id])
+  personalAnterior   Personal     @relation("PersonalAnterior", fields: [fkPersonalAnterior], references: [id])
+  personalNuevo      Personal     @relation("PersonalNuevo", fields: [fkPersonalNuevo], references: [id])
+  usuarioAnterior    User         @relation("UsuarioAnterior", fields: [fkUsuarioAnterior], references: [id])
+  usuarioNuevo       User         @relation("UsuarioNuevo", fields: [fkUsuarioNuevo], references: [id])
+  historialCambios   HistorialCambio[]
+
+  @@map("reasignaciones")
+  @@index([fkActivoUnidad])
+  @@index([fkUsuarioAnterior])
+  @@index([fkUsuarioNuevo])
+  @@index([fkPersonalAnterior])
+  @@index([fkPersonalNuevo])
+}
+
+model HistorialCambio {
+  id                Int              @id @default(autoincrement())
+  fkActivoUnidad    Int?
+  fkAsignacion      Int?
+  fkReasignacion    Int?
+  fkDepreciacion    Int?
+  fkEstadoActivo    Int?             
+  fkDevolucion      Int?
+  fechaCambio       DateTime
+  tipoCambio        String
+  detalle           String
+  activoUnidad      ActivoUnidad?    @relation(fields: [fkActivoUnidad], references: [id])
+  asignacion        Asignacion?      @relation(fields: [fkAsignacion], references: [id])
+  reasignacion      Reasignacion?    @relation(fields: [fkReasignacion], references: [id])
+  depreciacion      Depreciacion?    @relation(fields: [fkDepreciacion], references: [id])
+  estadoActivo      EstadoActivo?    @relation(fields: [fkEstadoActivo], references: [id])
+  devolucion        Devolucion?      @relation(fields: [fkDevolucion], references: [id])
+
+  @@map("historial_cambios")
+  @@index([fkActivoUnidad])
+  @@index([fkAsignacion])
+  @@index([fkReasignacion])
+  @@index([fkDepreciacion])
+  @@index([fkEstadoActivo])
+  @@index([fkDevolucion])
+}
+
+model EstadoActivo {
+  id                Int           @id @default(autoincrement())
+  fkActivoUnidad    Int
+  fechaCambio       DateTime
+  estadoAnterior    String
+  estadoNuevo       String
+  motivoCambio      String?
+  activoUnidad      ActivoUnidad  @relation(fields: [fkActivoUnidad], references: [id])
+  historialCambios  HistorialCambio[]
+
+  @@map("estado_activos")
+  @@index([fkActivoUnidad])
+}
+
+model Devolucion {
+  id             Int            @id @default(autoincrement())
+  fkPersonal     Int
+  fkUsuario      String         
+  fkActivoUnidad Int
+  fecha          DateTime       @default(now())
+  detalle        String
+  actaDevolucion String         
+  personal       Personal       @relation(fields: [fkPersonal], references: [id])
+  usuario        User           @relation(fields: [fkUsuario], references: [id])
+  activoUnidad   ActivoUnidad   @relation(fields: [fkActivoUnidad], references: [id])
+  historialCambios  HistorialCambio[]
+
+  @@map("devoluciones")
+  @@index([fkPersonal])
+  @@index([fkUsuario])
+  @@index([fkActivoUnidad])
+}
+
+model Revision {
+  id             Int          @id @default(autoincrement())
+  tipo           String       // "PERIODICA", "SORPRESA", "VACACIONES", "CAMBIO_UNIDAD", "CULMINACION_CONTRATO"
+  fecha          DateTime     @default(now()) // Fecha en que se realizó la revisión
+  fechaCierre    DateTime     // Fecha/hora en que la revisión se cerrará automáticamente
+  estado         String       // "PENDIENTE", "FINALIZADA"
+  general        Boolean      @default(false) // Para diferenciar si es una revisión general (para todo el personal)
+  observaciones  String?
+  aprobado       Boolean      @default(false) // Si la solvencia fue aprobada
+  
+  // Relación a personal solo si es una revisión individual
+  fkPersonal     Int?         // Solo en caso de revisión individual
+  personal       Personal?    @relation(fields: [fkPersonal], references: [id]) 
+
+  // Relación con el nuevo modelo RevisionPersonal
+  detalles       RevisionPersonal[]  // Relación con el modelo que guarda los detalles de cada personal en revisiones generales e individuales
+
+  @@map("revisiones")
+  @@index([fkPersonal])
+}
+
+model RevisionPersonal {
+  id             Int      @id @default(autoincrement())
+  fkRevision     Int      // Relación a la revisión general o individual
+  fkPersonal     Int      // Relación a cada personal involucrado en la revisión
+  aprobado       Boolean  // Si fue aprobado
+  observaciones  String?  // Observaciones específicas
+
+  personal       Personal @relation(fields: [fkPersonal], references: [id])
+  revision       Revision @relation(fields: [fkRevision], references: [id])
+
+  @@map("revision_personal")
+  @@index([fkRevision])
+  @@index([fkPersonal])
+  
+  // Definir una clave compuesta para fkRevision y fkPersonal
+  @@unique([fkRevision, fkPersonal])
+}
+
+
